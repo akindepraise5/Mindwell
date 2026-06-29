@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MindWell — Admin Analytics</title>
+
+  <!-- Same Supabase client the student app uses (aggregate RPCs only). -->
+  <script type="importmap">
+    {
+      "imports": {
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+      }
+    }
+  </script>
+  <script type="module" src="./supabase.js"></script>
+
+  <style>
+    /* ====== Admin theme — intentionally distinct from the student app:
+       neutral slate palette, system sans, no serif, no illustrations. ====== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #F4F6F8;
+      --surface: #FFFFFF;
+      --ink: #1F2733;
+      --ink-mid: #56616E;
+      --ink-soft: #8A95A1;
+      --line: #E5E9EE;
+      --brand: #2F6F6A;       /* calm teal — different from student purple */
+      --brand-soft: #E6F0EF;
+      --great: #7A9E7E; --okay: #C9A227; --meh: #9B8FBE; --rough: #E5717A; --sleepy: #6D5EF3;
+      --radius: 12px;
+      --shadow: 0 1px 2px rgba(16,24,40,0.04), 0 4px 16px rgba(16,24,40,0.05);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    html, body { background: var(--bg); color: var(--ink); font-family: var(--font); }
+    body { min-height: 100vh; }
+
+    .admin-topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      padding: 16px 32px;
+      display: flex; align-items: center; gap: 14px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .admin-logo {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: var(--brand); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.95rem; letter-spacing: -0.02em;
+    }
+    .admin-brand { font-weight: 600; font-size: 1.02rem; }
+    .admin-brand small { display: block; font-weight: 400; font-size: 0.74rem; color: var(--ink-soft); }
+    .admin-spacer { flex: 1; }
+    .admin-badge {
+      font-size: 0.72rem; font-weight: 600; color: var(--brand);
+      background: var(--brand-soft); padding: 5px 10px; border-radius: 100px;
+    }
+    .admin-logout {
+      border: 1px solid var(--line); background: var(--surface); color: var(--ink-mid);
+      padding: 8px 16px; border-radius: 8px; font-size: 0.84rem; cursor: pointer; font-family: var(--font);
+    }
+    .admin-logout:hover { border-color: var(--brand); color: var(--brand); }
+
+    .admin-wrap { max-width: 1120px; margin: 0 auto; padding: 28px 32px 64px; }
+    .admin-h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -0.02em; }
+    .admin-sub { color: var(--ink-soft); font-size: 0.9rem; margin-top: 4px; }
+    .admin-privacy {
+      margin-top: 14px; font-size: 0.8rem; color: var(--ink-mid);
+      background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--brand);
+      border-radius: 8px; padding: 10px 14px;
+    }
+
+    .section-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin: 32px 0 14px; }
+
+    /* Metric cards */
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .metric-grid { grid-template-columns: 1fr; } }
+    .metric-card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 18px 20px; box-shadow: var(--shadow);
+    }
+    .metric-label { font-size: 0.8rem; color: var(--ink-mid); }
+    .metric-value { font-size: 1.9rem; font-weight: 680; letter-spacing: -0.02em; margin-top: 6px; }
+    .metric-value small { font-size: 0.95rem; font-weight: 500; color: var(--ink-soft); }
+
+    /* Chart cards */
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 20px 22px; box-shadow: var(--shadow);
+    }
+    .panel h3 { font-size: 0.98rem; font-weight: 620; margin-bottom: 4px; }
+    .panel .panel-sub { font-size: 0.8rem; color: var(--ink-soft); margin-bottom: 16px; }
+    .panel.span-2 { grid-column: 1 / -1; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-top: 14px; }
+    .legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; color: var(--ink-mid); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    .pie-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+
+    /* Activity feed */
+    .activity-list { list-style: none; display: flex; flex-direction: column; }
+    .activity-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; color: var(--ink);
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+    .activity-num { font-weight: 680; }
+
+    .empty {
+      color: var(--ink-soft); font-size: 0.9rem; text-align: center;
+      padding: 28px 16px; border: 1px dashed var(--line); border-radius: 10px; background: #FBFCFD;
+    }
+    .hidden { display: none !important; }
+
+    .bars { display: flex; align-items: flex-end; gap: 28px; height: 180px; padding: 8px 8px 0; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+    .bar { width: 100%; max-width: 80px; border-radius: 8px 8px 0 0; transition: height .4s ease; min-height: 2px; }
+    .bar-num { font-weight: 680; font-size: 1.05rem; margin-bottom: 6px; }
+    .bar-label { font-size: 0.8rem; color: var(--ink-mid); margin-top: 8px; }
+
+    /* Gate / loading overlay */
+    .gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; z-index: 50; }
+    .gate p { color: var(--ink-mid); font-size: 0.92rem; }
+    .spinner { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body>
+  <!-- Gate: blocks content until an admin session is confirmed -->
+  <div class="gate" id="gate">
+    <div class="spinner"></div>
+    <p id="gateMsg">Checking access…</p>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="admin-topbar">
+      <div class="admin-logo">M</div>
+      <div class="admin-brand">MindWell <small>Admin analytics</small></div>
+      <div class="admin-spacer"></div>
+      <span class="admin-badge">Aggregate · Anonymized</span>
+      <button class="admin-logout" onclick="adminLogout()">Sign out</button>
+    </div>
+
+    <div class="admin-wrap">
+      <h1 class="admin-h1">Wellness overview</h1>
+      <p class="admin-sub">Aggregate, anonymized statistics across all students.</p>
+      <div class="admin-privacy">
+        🔒 Privacy-first: this dashboard shows only aggregate counts. No names, emails, reflections,
+        conversations, mood notes, reminders, or onboarding responses are ever accessible here.
+      </div>
+
+      <div id="globalEmpty" class="empty hidden" style="margin-top:24px;">Data will appear as students begin using MindWell.</div>
+
+      <!-- Metric cards -->
+      <div class="section-title">Summary</div>
+      <div class="metric-grid" id="metricGrid"></div>
+
+      <!-- Charts -->
+      <div class="section-title">Trends</div>
+      <div class="chart-grid">
+        <div class="panel">
+          <h3>Mood distribution</h3>
+          <p class="panel-sub">Share of each mood across all check-ins.</p>
+          <div id="piePanel"></div>
+        </div>
+        <div class="panel">
+          <h3>Reminder engagement</h3>
+          <p class="panel-sub">How students respond to gentle nudges.</p>
+          <div id="barPanel"></div>
+        </div>
+        <div class="panel span-2">
+          <h3>Weekly mood check-ins</h3>
+          <p class="panel-sub">Number of check-ins per day (last 7 days).</p>
+          <div id="linePanel"></div>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div class="section-title">Recent activity (today)</div>
+      <div class="panel">
+        <ul class="activity-list" id="activityList"></ul>
+        <div id="activityEmpty" class="empty hidden">Data will appear as students begin using MindWell.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MOOD_COLORS = { Great: '#7A9E7E', Okay: '#C9A227', Meh: '#9B8FBE', Rough: '#E5717A', Sleepy: '#6D5EF3' };
+    const MOOD_ORDER = ['Great', 'Okay', 'Meh', 'Rough', 'Sleepy'];
+
+    function whenSupabaseReady() {
+      return new Promise((resolve) => {
+        if (window.supabase) return resolve(window.supabase);
+        document.addEventListener('supabase-ready', () => resolve(window.supabase), { once: true });
+        const poll = setInterval(() => { if (window.supabase) { clearInterval(poll); resolve(window.supabase); } }, 50);
+      });
+    }
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    async function adminLogout() {
+      try { const sb = await whenSupabaseReady(); await sb.auth.signOut(); } catch (e) {}
+      window.location.replace('./mindwell-landing.html');
+    }
+
+    /* ---------- Gate: admins only ---------- */
+    async function gate() {
+      const sb = await whenSupabaseReady();
+      let session = null;
+      try { const { data } = await sb.auth.getSession(); session = data.session; } catch (e) {}
+      if (!session) { window.location.replace('./mindwell-landing.html'); return null; }
+      let role = 'student';
+      try {
+        const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
+        role = (data && data.role) || 'student';
+      } catch (e) {}
+      if (role !== 'admin') { window.location.replace('./mindwell-landing.html'); return null; }
+      return sb;
+    }
+
+    /* ---------- Render helpers ---------- */
+    function renderMetrics(m) {
+      m = m || {};
+      const cards = [
+        ['Total Users', m.total_users],
+        ['Total Reflections', m.total_reflections],
+        ['Total Mood Check-ins', m.total_mood_logs],
+        ['Total Conversations', m.total_conversations],
+        ['Total Reminders Sent', m.total_reminders],
+        ['Support Alerts Triggered', m.total_support_alerts],
+        ['Most Common Mood', m.most_common_mood || '—'],
+        ['Average Mood Score', (m.avg_mood_score != null ? m.avg_mood_score : '—'), '/ 5']
+      ];
+      document.getElementById('metricGrid').innerHTML = cards.map(c => `
+        <div class="metric-card">
+          <div class="metric-label">${esc(c[0])}</div>
+          <div class="metric-value">${esc(c[1] == null ? 0 : c[1])}${c[2] ? ' <small>' + esc(c[2]) + '</small>' : ''}</div>
+        </div>`).join('');
+    }
+
+    // ---- Pie (SVG) ----
+    function polar(cx, cy, r, deg) { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+    function arc(cx, cy, r, start, end) {
+      const [x1, y1] = polar(cx, cy, r, end);
+      const [x2, y2] = polar(cx, cy, r, start);
+      const large = (end - start) % 360 <= 180 ? 0 : 1;
+      return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 0 ${x2} ${y2} Z`;
+    }
+    function renderPie(dist) {
+      const panel = document.getElementById('piePanel');
+      dist = dist || {};
+      const total = MOOD_ORDER.reduce((s, k) => s + (dist[k] || 0), 0);
+      if (!total) { panel.innerHTML = `<div class="empty">Data will appear as students begin using MindWell.</div>`; return; }
+      const cx = 90, cy = 90, r = 84;
+      let angle = 0, paths = '';
+      MOOD_ORDER.forEach(k => {
+        const val = dist[k] || 0; if (!val) return;
+        const sweep = (val / total) * 360;
+        if (sweep >= 359.999) {
+          paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${MOOD_COLORS[k]}"></circle>`;
+        } else {
+          paths += `<path d="${arc(cx, cy, r, angle, angle + sweep)}" fill="${MOOD_COLORS[k]}"></path>`;
+        }
+        angle += sweep;
+      });
+      const legend = MOOD_ORDER.map(k => {
+        const val = dist[k] || 0; const pct = total ? Math.round((val / total) * 100) : 0;
+        return `<div class="legend-item"><span class="legend-dot" style="background:${MOOD_COLORS[k]}"></span>${k} · ${val} (${pct}%)</div>`;
+      }).join('');
+      panel.innerHTML = `<div class="pie-row">
+        <svg width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="Mood distribution">${paths}</svg>
+        <div class="legend" style="flex-direction:column;">${legend}</div>
+      </div>`;
+    }
+
+    // ---- Line (SVG) ----
+    function renderLine(weekly) {
+      const panel = document.getElementById('linePanel');
+      const data = Array.isArray(weekly) ? weekly : [];
+      const total = data.reduce((s, d) => s + (d.count || 0), 0);
+      if (!data.length || !total) { panel.innerHTML = `<div class="empty">Data will appear as students begin using MindWell.</div>`; return; }
+      const W = 720, H = 200, padL = 30, padR = 16, padT = 16, padB = 28;
+      const max = Math.max(1, ...data.map(d => d.count || 0));
+      const n = data.length;
+      const xstep = (W - padL - padR) / Math.max(1, n - 1);
+      const yOf = v => padT + (H - padT - padB) * (1 - (v / max));
+      const pts = data.map((d, i) => [padL + i * xstep, yOf(d.count || 0)]);
+      const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const area = line + ` L ${pts[n - 1][0].toFixed(1)} ${H - padB} L ${pts[0][0].toFixed(1)} ${H - padB} Z`;
+      const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#2F6F6A"></circle>`).join('');
+      const labels = data.map((d, i) => `<text x="${(padL + i * xstep).toFixed(1)}" y="${H - 8}" font-size="11" fill="#8A95A1" text-anchor="middle">${esc(d.label)}</text>`).join('');
+      const counts = pts.map((p, i) => `<text x="${p[0].toFixed(1)}" y="${(p[1] - 8).toFixed(1)}" font-size="11" fill="#56616E" text-anchor="middle">${data[i].count || 0}</text>`).join('');
+      panel.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly check-ins">
+        <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#E5E9EE"></line>
+        <path d="${area}" fill="#2F6F6A" opacity="0.08"></path>
+        <path d="${line}" fill="none" stroke="#2F6F6A" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></path>
+        ${dots}${counts}${labels}
+      </svg>`;
+    }
+
+    // ---- Bar (reminder engagement) ----
+    function renderBars(eng) {
+      const panel = document.getElementById('barPanel');
+      eng = eng || {};
+      const items = [
+        ['Completed', eng.completed || 0, '#7A9E7E'],
+        ['Dismissed', eng.dismissed || 0, '#E5717A'],
+        ['Remind later', eng.remind_later || 0, '#C9A227']
+      ];
+      const total = items.reduce((s, i) => s + i[1], 0);
+      if (!total) { panel.innerHTML = `<div class="empty">Data will appear as students begin using MindWell.</div>`; return; }
+      const max = Math.max(1, ...items.map(i => i[1]));
+      panel.innerHTML = `<div class="bars">${items.map(i => `
+        <div class="bar-col">
+          <span class="bar-num">${i[1]}</span>
+          <div class="bar" style="height:${Math.round((i[1] / max) * 150)}px;background:${i[2]};"></div>
+          <span class="bar-label">${i[0]}</span>
+        </div>`).join('')}</div>`;
+    }
+
+    function renderActivity(a) {
+      a = a || {};
+      const lines = [
+        [a.new_users_today, 'new users joined today.'],
+        [a.mood_checkins_today, 'mood check-ins recorded today.'],
+        [a.conversations_today, 'reflective conversations today.'],
+        [a.reminders_today, 'reminders sent today.'],
+        [a.support_alerts_today, 'support alerts triggered today.']
+      ];
+      const anyToday = lines.some(l => (l[0] || 0) > 0);
+      const list = document.getElementById('activityList');
+      const empty = document.getElementById('activityEmpty');
+      if (!anyToday) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+      list.innerHTML = lines.map(l => `
+        <li class="activity-item"><span class="activity-dot"></span>
+          <span><span class="activity-num">${esc(l[0] || 0)}</span> ${esc(l[1])}</span>
+        </li>`).join('');
+    }
+
+    /* ---------- Boot ---------- */
+    (async function init() {
+      const sb = await gate();
+      if (!sb) return; // redirected
+
+      // All stats come from aggregate RPCs — no individual records are fetched.
+      const safe = (p) => p.then(r => (r && r.error ? null : (r ? r.data : null))).catch(() => null);
+      const [metrics, dist, weekly, eng, activity] = await Promise.all([
+        safe(sb.rpc('admin_metrics')),
+        safe(sb.rpc('admin_mood_distribution')),
+        safe(sb.rpc('admin_weekly_checkins')),
+        safe(sb.rpc('admin_reminder_engagement')),
+        safe(sb.rpc('admin_recent_activity'))
+      ]);
+
+      renderMetrics(metrics);
+      renderPie(dist);
+      renderLine(weekly);
+      renderBars(eng);
+      renderActivity(activity);
+
+      // Global empty banner when there's genuinely no data yet.
+      const m = metrics || {};
+      const hasData = (m.total_users || 0) + (m.total_mood_logs || 0) + (m.total_conversations || 0) + (m.total_reminders || 0) > 0;
+      document.getElementById('globalEmpty').classList.toggle('hidden', hasData);
+
+      document.getElementById('gate').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+    })();
+  </script>
+</body>
+
+</html>
