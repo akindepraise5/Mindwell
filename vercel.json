@@ -1,0 +1,7 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/mindwell-landing.html" },
+    { "source": "/admin", "destination": "/admin.html" }
+  ]
+}
