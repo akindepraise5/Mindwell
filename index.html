@@ -67,6 +67,9 @@
       scroll-behavior: smooth;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      /* Stop mobile browsers from inflating text unpredictably (esp. landscape) */
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -4955,6 +4958,39 @@
         width: 100%;
         justify-content: center;
       }
+    }
+
+    /* ===== MOBILE HARDENING — applies on top of the breakpoints above ===== */
+    @media (max-width: 900px) {
+      /* iOS Safari zooms the page when a focused field is < 16px. Force 16px on
+         every text field so tapping an input never jolts the layout. The large
+         onboarding time picker keeps its own size via the :not() exclusion. */
+      input:not(.time-native-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+      textarea,
+      select {
+        font-size: 16px !important;
+      }
+      /* Thumb-friendly tap targets (>= 44px recommended) */
+      .ms-icon-btn, .ms-send-btn { width: 44px; height: 44px; }
+      /* Belt-and-braces guard against anything forcing horizontal scroll */
+      .dash-main { overflow-x: hidden; }
+      img, svg, video { max-width: 100%; }
+    }
+
+    /* ===== SMALL PHONES (<= 400px) — tighten typography & spacing ===== */
+    @media (max-width: 400px) {
+      .ms-title { font-size: 1.5rem; }
+      .ms-subtitle { font-size: 0.88rem; }
+      .ms-feeling-title { font-size: 1.2rem; }
+      .ms-feeling-card { padding: 18px 14px; }
+      .ms-ai-btn { padding: 8px 12px; font-size: 0.8rem; }
+      .ms-date-pill { padding: 8px 12px; }
+      .let-it-out-title,
+      .mood-memory-title,
+      .gs-title,
+      .settings-title { font-size: 1.55rem; }
+      .dash-nav-link { font-size: 0.56rem; }
+      .dash-nav-link i { font-size: 1.25rem; }
     }
 
     /* ===== MVP FUNCTIONALITY COMPONENTS ===== */
