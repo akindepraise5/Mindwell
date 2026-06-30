@@ -2327,6 +2327,32 @@
     .time-btn-arrow:hover {
       color: var(--accent);
     }
+    /* Accessible native time input — reliable across mouse, keyboard, touch */
+    .time-native-input {
+      font-family: inherit;
+      font-size: 2.2rem;
+      font-weight: 400;
+      color: var(--text-mid);
+      background: transparent;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .time-native-input:hover { border-color: var(--accent); }
+    .time-native-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      color: var(--text-dark);
+    }
+    .time-native-input::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.55;
+      transition: opacity 0.2s;
+    }
+    .time-native-input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
     .time-num {
       font-family: monospace;
       color: var(--text);
@@ -5487,7 +5513,7 @@
             <form onsubmit="handleLoginSubmit(event)">
               <div class="form-group">
                 <label for="loginEmail">Email Address</label>
-                <input type="email" id="loginEmail" class="form-control" placeholder="e.g. name@student.edu.ng" required />
+                <input type="email" id="loginEmail" class="form-control" placeholder="Enter your email address" required />
               </div>
               <div class="form-group">
                 <label for="loginPassword">Password</label>
@@ -5549,7 +5575,7 @@
               </div>
               <div class="form-group">
                 <label for="regEmail">Email Address</label>
-                <input type="email" id="regEmail" class="form-control" placeholder="e.g. name@student.edu.ng" required />
+                <input type="email" id="regEmail" class="form-control" placeholder="Enter your email address" required />
               </div>
               <div class="form-group">
                 <label for="regPassword">Password</label>
@@ -5594,7 +5620,7 @@
             <form onsubmit="handleForgotSubmit(event)">
               <div class="form-group">
                 <label for="forgotEmail">Email Address</label>
-                <input type="email" id="forgotEmail" class="form-control" placeholder="e.g. name@student.edu.ng" required />
+                <input type="email" id="forgotEmail" class="form-control" placeholder="Enter your email address" required />
               </div>
               <button type="submit" class="btn-fill" style="width: 100%; justify-content: center; margin-top: 12px;">
                 Send reset link
@@ -5771,20 +5797,7 @@
             <div class="time-frequency-setup">
               <div class="time-picker-mock">
                 <div class="time-picker-label">Check-in time</div>
-                <div class="time-display-scroll">
-                  <div class="time-col">
-                    <button class="time-btn-arrow" onclick="adjustTimeHour(1)"><i class="hgi-stroke hgi-arrow-up-01"></i></button>
-                    <span class="time-num" id="timeHour">08</span>
-                    <button class="time-btn-arrow" onclick="adjustTimeHour(-1)"><i class="hgi-stroke hgi-arrow-down-01"></i></button>
-                  </div>
-                  <div>:</div>
-                  <div class="time-col">
-                    <button class="time-btn-arrow" onclick="adjustTimeMin(5)"><i class="hgi-stroke hgi-arrow-up-01"></i></button>
-                    <span class="time-num" id="timeMin">30</span>
-                    <button class="time-btn-arrow" onclick="adjustTimeMin(-5)"><i class="hgi-stroke hgi-arrow-down-01"></i></button>
-                  </div>
-                  <div class="time-ampm" onclick="toggleAmPm()" id="timeAmPm">PM</div>
-                </div>
+                <input type="time" id="onboardCheckinTime" class="time-native-input" value="20:30" aria-label="Check-in time" />
               </div>
               <div class="freq-selector">
                 <div class="freq-option" onclick="selectFrequencyAndCheck(this)">
@@ -7283,7 +7296,7 @@
         const supportStyles = Array.from(document.querySelectorAll('#onStep3 .support-card.active h4'))
           .map(el => el.textContent).join(', ');
         const freq = activeFreq.querySelector('span').textContent;
-        const timeVal = `${document.getElementById('timeHour').textContent}:${document.getElementById('timeMin').textContent} ${document.getElementById('timeAmPm').textContent}`;
+        const timeVal = onboardTime12h();
 
         const summaryUl = document.getElementById('personalizationSummary');
         if (summaryUl) {
@@ -7328,28 +7341,18 @@
       btnComplete.disabled = true; btnComplete.style.opacity = '0.5'; btnComplete.style.cursor = 'not-allowed';
     }
 
-    /* Time Picker Mock Adjustment Functions */
-    let pickerHour = 8;
-    let pickerMin = 30;
-    let pickerAmPm = 'PM';
-
-    function adjustTimeHour(amount) {
-      pickerHour += amount;
-      if (pickerHour > 12) pickerHour = 1;
-      if (pickerHour < 1) pickerHour = 12;
-      document.getElementById('timeHour').textContent = String(pickerHour).padStart(2, '0');
-    }
-
-    function adjustTimeMin(amount) {
-      pickerMin += amount;
-      if (pickerMin >= 60) pickerMin = 0;
-      if (pickerMin < 0) pickerMin = 55;
-      document.getElementById('timeMin').textContent = String(pickerMin).padStart(2, '0');
-    }
-
-    function toggleAmPm() {
-      pickerAmPm = pickerAmPm === 'AM' ? 'PM' : 'AM';
-      document.getElementById('timeAmPm').textContent = pickerAmPm;
+    /* Check-in time picker — reads the native <input type="time"> (24h "HH:MM")
+       and returns the app's stored format, e.g. "08:30 PM". */
+    function onboardTime12h() {
+      const el = document.getElementById('onboardCheckinTime');
+      const v = (el && el.value) || '20:30';
+      const parts = String(v).split(':');
+      let h = parseInt(parts[0], 10);
+      const m = (parts[1] || '00').padStart(2, '0');
+      if (isNaN(h)) { h = 20; }
+      const ap = h >= 12 ? 'PM' : 'AM';
+      h = h % 12; if (h === 0) h = 12;
+      return `${String(h).padStart(2, '0')}:${m} ${ap}`;
     }
 
     // Wire up existing CTA buttons to open overlay
@@ -7408,7 +7411,7 @@
         const supportStyles = Array.from(document.querySelectorAll('#onStep3 .support-card.active h4'))
           .map(el => el.textContent);
 
-        const timeVal = `${document.getElementById('timeHour').textContent}:${document.getElementById('timeMin').textContent} ${document.getElementById('timeAmPm').textContent}`;
+        const timeVal = onboardTime12h();
         const activeFreqEl = document.querySelector('.freq-option.active');
         const frequency = activeFreqEl ? (activeFreqEl.querySelector('span') || {}).textContent || '' : '';
         const privacyAck = !!(document.getElementById('privacyCheckbox') && document.getElementById('privacyCheckbox').checked);
