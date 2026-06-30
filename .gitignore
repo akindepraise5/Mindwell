@@ -15,6 +15,9 @@ yarn-error.log*
 logs/
 *.log
 
+# Claude Code session data
+.claude/
+
 # OS / editor
 .DS_Store
 Thumbs.db
