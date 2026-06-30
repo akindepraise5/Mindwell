@@ -5958,11 +5958,10 @@
               <textarea class="ms-input-field" id="msThoughtInput" rows="1" placeholder="Type your thoughts here..."></textarea>
               <div class="ms-input-controls">
                 <div class="ms-input-controls-left">
-                  <button class="ms-icon-btn" title="Voice note" onclick="alert('Voice note recording not yet implemented.')"><i class="hgi-stroke hgi-mic-01"></i></button>
-                  <button class="ms-icon-btn" title="Audio" onclick="alert('Audio note not yet implemented.')"><i class="hgi-stroke hgi-audio-wave-01"></i></button>
-                  <button class="ms-ai-btn" onclick="alert('MindWell AI chat coming soon.')"><i class="hgi-stroke hgi-sparkles"></i> Talk with MindWell AI</button>
+                  <button class="ms-icon-btn" title="Voice note" onclick="msStartVoice()"><i class="hgi-stroke hgi-mic-01"></i></button>
+                  <button class="ms-ai-btn" onclick="msTalkToAI()"><i class="hgi-stroke hgi-sparkles"></i> Talk with MindWell AI</button>
                 </div>
-                <button class="ms-send-btn" title="Send" onclick="sendMyThought()"><i class="hgi-stroke hgi-arrow-up-01"></i></button>
+                <button class="ms-send-btn" title="Send" onclick="sendMyThought()"><i class="hgi-stroke hgi-sent"></i></button>
               </div>
             </div>
 
@@ -9624,16 +9623,49 @@
       input.style.height = input.scrollHeight + 'px';
     }
 
-    // Override: Send saves the message to localStorage
+    /* =========================================================
+       My Space = Quick Capture. Its three actions (write, voice, AI)
+       all converge into Let It Out (Deep Reflection), reusing that page's
+       existing chat, voice-recording, conversation, and navigation logic.
+       No second implementation of any of those features is created here.
+       ========================================================= */
+
+    // "Talk with MindWell AI" → open Let It Out with the AI chat ready.
+    function msTalkToAI() {
+      switchDashTab(null, 'dashTabLetItOut');
+      setLioMode('chat');
+      const ta = document.getElementById('letItOutTextarea');
+      if (ta) setTimeout(() => { try { ta.focus(); } catch (e) {} }, 0);
+    }
+
+    // Microphone → reuse Let It Out's voice recorder (one recorder app-wide).
+    function msStartVoice() {
+      switchDashTab(null, 'dashTabLetItOut');
+      setLioMode('voice');
+      const ta = document.getElementById('letItOutTextarea');
+      if (ta) { try { ta.blur(); } catch (e) {} }
+      startVoiceRecording();
+    }
+
+    // Send a written reflection: validate, keep it in the My Space capture log,
+    // then hand off to Let It Out's chat where it's displayed and continuable.
     function sendMyThought() {
       const input = document.getElementById('msThoughtInput');
-      if (!input || !input.value.trim()) { if (input) input.focus(); return; }
+      const text = input ? input.value.trim() : '';
+      if (!text) { if (input) input.focus(); return; }
+
+      // Preserve the My Space "Recent thoughts" capture log.
       const messages = getData('mindwell_messages', []);
-      messages.push({ id: uid(), text: input.value.trim(), createdAt: Date.now() });
+      messages.push({ id: uid(), text: text, createdAt: Date.now() });
       saveData('mindwell_messages', messages);
       input.value = '';
       input.style.height = 'auto';
       renderRecentMessages();
+
+      // Hand off to Deep Reflection — reuses the existing chat pipeline.
+      switchDashTab(null, 'dashTabLetItOut');
+      setLioMode('chat');
+      chatSend(text);
     }
 
     function renderRecentMessages() {
