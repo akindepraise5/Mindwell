@@ -208,7 +208,7 @@
 
     async function adminLogout() {
       try { const sb = await whenSupabaseReady(); await sb.auth.signOut(); } catch (e) {}
-      window.location.replace('./mindwell-landing.html');
+      window.location.replace('/');
     }
 
     /* ---------- Gate: admins only ---------- */
@@ -216,13 +216,13 @@
       const sb = await whenSupabaseReady();
       let session = null;
       try { const { data } = await sb.auth.getSession(); session = data.session; } catch (e) {}
-      if (!session) { window.location.replace('./mindwell-landing.html'); return null; }
+      if (!session) { window.location.replace('/'); return null; }
       let role = 'student';
       try {
         const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
         role = (data && data.role) || 'student';
       } catch (e) {}
-      if (role !== 'admin') { window.location.replace('./mindwell-landing.html'); return null; }
+      if (role !== 'admin') { window.location.replace('/'); return null; }
       return sb;
     }
 

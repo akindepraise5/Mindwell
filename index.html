@@ -10618,7 +10618,7 @@
         try { localStorage.clear(); } catch (e) {}
         try { await sb.auth.signOut(); } catch (e) {}
         try { sessionStorage.setItem('mindwell_account_deleted', '1'); } catch (e) {}
-        window.location.replace('./mindwell-landing.html');
+        window.location.replace('/');
       } catch (e) {
         console.warn('confirmDeleteAccount', e);
         if (err) { err.textContent = 'Something went wrong. Please try again.'; err.style.display = 'block'; }
